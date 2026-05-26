@@ -9,11 +9,29 @@ export type TransactionWithRelations = TransactionRow & {
   accounts:   Pick<AccountRow,  "name"> | null;
 };
 
+// ─── Utilities ────────────────────────────────────────────────────────────────
+
 function getMonthRange(month: number, year: number) {
   const start = `${year}-${String(month).padStart(2, "0")}-01`;
   const end   = new Date(year, month, 0).toISOString().split("T")[0];
   return { start, end };
 }
+
+/** Return the Monday and Sunday of the ISO week that contains `date` */
+export function getWeekRange(date: Date): { start: string; end: string } {
+  const d   = new Date(date);
+  const day = d.getDay(); // 0 = Sun
+  // Shift so Monday = 0
+  const diffToMon = (day === 0 ? -6 : 1 - day);
+  const mon = new Date(d);
+  mon.setDate(d.getDate() + diffToMon);
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  const fmt = (dt: Date) => dt.toISOString().split("T")[0];
+  return { start: fmt(mon), end: fmt(sun) };
+}
+
+// ─── Hooks ────────────────────────────────────────────────────────────────────
 
 export function useTransactions(month: number, year: number) {
   const supabase = createClient();
@@ -36,6 +54,32 @@ export function useTransactions(month: number, year: number) {
   });
 }
 
+/**
+ * Fetch transactions for any arbitrary date range.
+ * Used by comparison charts and other range-based analytics.
+ */
+export function useTransactionsByRange(start: string, end: string, enabled = true) {
+  const supabase = createClient();
+
+  return useQuery<TransactionWithRelations[]>({
+    queryKey: ["transactions-range", start, end],
+    enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*, categories(name,icon,color), accounts(name)")
+        .eq("is_deleted", false)
+        .gte("date", start)
+        .lte("date", end)
+        .order("date", { ascending: true });
+
+      if (error) throw new Error(error.message);
+      return (data ?? []) as TransactionWithRelations[];
+    },
+  });
+}
+
+/** Light-weight summary (no joins) for a month — used by dashboard summary cards */
 export function useDashboardSummary(month: number, year: number) {
   const supabase = createClient();
   const { start, end } = getMonthRange(month, year);
