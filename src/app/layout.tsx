@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Script from "next/script";
 import { Providers } from "@/components/layout/Providers";
 
 export const metadata: Metadata = {
@@ -17,12 +16,16 @@ export default function RootLayout({
   return (
     <html lang="vi" suppressHydrationWarning>
       <head>
-        {/* Anti-flash: apply dark class before first paint */}
-        <Script id="theme-init" strategy="beforeInteractive">
-          {`try{const t=localStorage.getItem('finflow-theme');const d=window.matchMedia('(prefers-color-scheme:dark)').matches;if(t==='dark'||((!t||t==='system')&&d))document.documentElement.classList.add('dark')}catch(_){}`}
-        </Script>
+        <script
+          id="theme-init"
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{const t=localStorage.getItem('finflow-theme');const d=window.matchMedia('(prefers-color-scheme:dark)').matches;if(t==='dark'||((!t||t==='system')&&d))document.documentElement.classList.add('dark')}catch(_){}}",
+          }}
+        />
       </head>
-      <body className="font-sans antialiased">
+      <body className="font-sans antialiased" suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>
     </html>
