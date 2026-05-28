@@ -4,10 +4,10 @@ import { createContext, useContext, useEffect, useState } from "react";
 
 type Theme = "light" | "dark" | "system";
 interface ThemeCtx {
-  theme:         Theme;
+  theme: Theme;
   resolvedTheme: "light" | "dark";
-  setTheme:      (t: Theme) => void;
-  toggle:        () => void;
+  setTheme: (t: Theme) => void;
+  toggle: () => void;
 }
 
 const ThemeContext = createContext<ThemeCtx | null>(null);
@@ -28,7 +28,9 @@ function applyTheme(resolved: "light" | "dark") {
 
 function resolve(theme: Theme): "light" | "dark" {
   if (theme !== "system") return theme;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -42,7 +44,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   });
   const [resolvedTheme, setResolved] = useState<"light" | "dark">(() => {
     try {
-      const saved = (localStorage.getItem("finflow-theme") as Theme) ?? "system";
+      const saved =
+        (localStorage.getItem("finflow-theme") as Theme) ?? "system";
       return resolve(saved);
     } catch {
       return "light";
