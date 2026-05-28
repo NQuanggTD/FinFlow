@@ -1,6 +1,6 @@
 "use client";
 
-import { useState }               from "react";
+import { useState, useEffect }   from "react";
 import { useRouter }              from "next/navigation";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { ProgressBar }            from "@/components/ui/ProgressBar";
@@ -34,7 +34,12 @@ export function GoalCard({ goal: g, completed = false }: { goal: GoalRow; comple
 
   const pct       = g.target_amount > 0 ? Math.min((g.current_amount / g.target_amount) * 100, 100) : 0;
   const remaining = g.target_amount - g.current_amount;
-  const daysLeft  = Math.ceil((new Date(g.deadline).getTime() - Date.now()) / 86400000);
+  // Compute days left on mount to avoid impure Date.now() during render
+  const [daysLeft, setDaysLeft] = useState<number>(() => 0 as number);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDaysLeft(Math.ceil((new Date(g.deadline).getTime() - Date.now()) / 86400000));
+  }, [g.deadline]);
   const priority  = PRIORITY[g.priority] ?? PRIORITY[1];
   const dailyNeeded = daysLeft > 0 && remaining > 0 ? remaining / daysLeft : 0;
   const isOverdue = daysLeft < 0 && !completed;

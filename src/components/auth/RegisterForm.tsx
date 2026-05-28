@@ -14,7 +14,7 @@ function SubmitButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" className="w-full mt-2" size="lg" loading={pending}>
-      Tạo tài khoản
+      Create account
     </Button>
   );
 }
@@ -37,10 +37,10 @@ export function RegisterForm() {
   const registerNotice = useMemo(() => {
     if (!state?.success || !state.message) return null;
     if (state.message === "email rate limit exceeded") {
-      return "Đã gửi email xác nhận, vui lòng kiểm tra hộp thư.";
+      return "Confirmation email has been sent. Please check your inbox.";
     }
     return state.message;
-  }, [state?.message, state?.success]);
+  }, [state]);
 
   useEffect(() => {
     if (state?.success) {
@@ -50,9 +50,9 @@ export function RegisterForm() {
           router.push(
             `/login?message=${encodeURIComponent(
               state.message === "email rate limit exceeded"
-                ? "Đã gửi email xác nhận, vui lòng kiểm tra hộp thư."
+                ? "Confirmation email has been sent. Please check your inbox."
                 : (state.message ??
-                    "Vui lòng kiểm tra email để xác nhận tài khoản"),
+                    "Please check your email to confirm your account"),
             )}`,
           ),
         1500,
@@ -63,7 +63,9 @@ export function RegisterForm() {
 
   useEffect(() => {
     if (state?.error || state?.success) {
-      setIsLocked(false);
+      // Avoid synchronous setState in effect; defer slightly
+      const t = window.setTimeout(() => setIsLocked(false), 0);
+      return () => clearTimeout(t);
     }
   }, [state]);
 
@@ -99,13 +101,14 @@ export function RegisterForm() {
       )}
       {state?.success && !registerNotice && (
         <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-lg text-sm text-emerald-700 flex items-center gap-2">
-          <span>✅</span> Đăng ký thành công — vui lòng kiểm tra email xác nhận.
+          <span>✅</span> Registration successful — please check your
+          confirmation email.
         </div>
       )}
       <Input
         name="full_name"
-        label="Họ và tên"
-        placeholder="Nguyễn Văn A"
+        label="Full name"
+        placeholder="John Doe"
         required
         leftAddon="👤"
       />
@@ -120,24 +123,24 @@ export function RegisterForm() {
       <Input
         name="password"
         type="password"
-        label="Mật khẩu"
-        placeholder="Tối thiểu 8 ký tự"
+        label="Password"
+        placeholder="At least 8 characters"
         required
         leftAddon="🔒"
-        hint="Ít nhất 8 ký tự"
+        hint="At least 8 characters"
       />
       <Input
         name="confirmPassword"
         type="password"
-        label="Xác nhận mật khẩu"
-        placeholder="Nhập lại mật khẩu"
+        label="Confirm password"
+        placeholder="Re-enter your password"
         required
         leftAddon="🔒"
       />
       <SubmitButton />
       {isLocked && !state?.success && !state?.error && (
         <p className="text-xs text-gray-400 text-center">
-          Đang xử lý yêu cầu đăng ký...
+          Processing registration request...
         </p>
       )}
     </form>

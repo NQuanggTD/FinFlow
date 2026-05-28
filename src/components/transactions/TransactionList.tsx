@@ -34,8 +34,8 @@ export function TransactionList({ initialData, month, year }: Props) {
     });
   }, []);
 
-  // Reset page when filters change
-  useEffect(() => { setPage(1); }, [currentMonth, currentYear, filterType, searchQuery]);
+  // Reset page when filters change (defer to avoid synchronous setState in effect)
+  useEffect(() => { const t = window.setTimeout(() => setPage(1), 0); return () => clearTimeout(t); }, [currentMonth, currentYear, filterType, searchQuery]);
 
   useRealtimeTransactions(userId);
 

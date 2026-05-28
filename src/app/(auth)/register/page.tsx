@@ -1,7 +1,7 @@
 import { RegisterForm } from "@/components/auth/RegisterForm";
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Đăng ký – FinFlow" };
+export const metadata: Metadata = { title: "Sign up – FinFlow" };
 
 export default function RegisterPage() {
   return (
@@ -12,19 +12,26 @@ export default function RegisterPage() {
             <div className="inline-flex items-center justify-center w-14 h-14 bg-indigo-600 rounded-2xl mb-3 shadow-lg">
               <span className="text-2xl">💰</span>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">Tạo tài khoản mới</h1>
-            <p className="text-gray-500 text-sm mt-1">Bắt đầu hành trình tài chính thông minh</p>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Create a new account
+            </h1>
+            <p className="text-gray-500 text-sm mt-1">
+              Start your smart financial journey
+            </p>
           </div>
           <RegisterForm />
           <p className="text-center text-sm text-gray-500 mt-6">
-            Đã có tài khoản?{" "}
-            <a href="/login" className="text-indigo-600 font-semibold hover:underline">
-              Đăng nhập
+            Already have an account?{" "}
+            <a
+              href="/login"
+              className="text-indigo-600 font-semibold hover:underline"
+            >
+              Sign in
             </a>
           </p>
         </div>
         <p className="text-center text-xs text-gray-400 mt-4">
-          FinFlow © 2026 · Bảo mật bởi Supabase Auth
+          FinFlow © 2026 · Secured by Supabase Auth
         </p>
       </div>
     </main>

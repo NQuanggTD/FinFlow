@@ -1,7 +1,7 @@
 import { LoginForm } from "@/components/auth/LoginForm";
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Đăng nhập – FinFlow" };
+export const metadata: Metadata = { title: "Sign in – FinFlow" };
 
 // Next.js 15: searchParams is now a Promise
 interface Props {
@@ -21,11 +21,9 @@ export default async function LoginPage({ searchParams }: Props) {
             <div className="inline-flex items-center justify-center w-14 h-14 bg-indigo-600 rounded-2xl mb-3 shadow-lg">
               <span className="text-2xl">💰</span>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Chào mừng trở lại
-            </h1>
+            <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
             <p className="text-gray-500 text-sm mt-1">
-              Đăng nhập vào tài khoản FinFlow
+              Sign in to your FinFlow account
             </p>
           </div>
 
@@ -34,7 +32,7 @@ export default async function LoginPage({ searchParams }: Props) {
             <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-sm text-emerald-700 flex items-start gap-2">
               <span className="flex-shrink-0">✅</span>
               <div className="leading-5 font-medium">
-                Đã gửi email xác nhận, vui lòng kiểm tra hộp thư
+                Confirmation email has been sent. Please check your inbox.
               </div>
             </div>
           )}
@@ -42,19 +40,19 @@ export default async function LoginPage({ searchParams }: Props) {
           <LoginForm />
 
           <p className="text-center text-sm text-gray-500 mt-6">
-            Chưa có tài khoản?{" "}
+            Do not have an account?{" "}
             <a
               href="/register"
               className="text-indigo-600 font-semibold hover:underline"
             >
-              Đăng ký miễn phí
+              Sign up for free
             </a>
           </p>
         </div>
 
         {/* Footer */}
         <p className="text-center text-xs text-gray-400 mt-4">
-          FinFlow © 2026 · Bảo mật bởi Supabase Auth
+          FinFlow © 2026 · Secured by Supabase Auth
         </p>
       </div>
     </main>

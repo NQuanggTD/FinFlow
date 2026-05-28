@@ -12,14 +12,12 @@ export default async function NewTransactionPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [{ data: catsData }, { data: accsData }] = await Promise.all([
-    (supabase.from("categories") as any).select("id, name, icon, type").order("name"),
-    (supabase.from("accounts")   as any).select("id, name, balance, type").eq("user_id", user.id).eq("is_active", true).order("created_at"),
-  ]);
+  const catsPromise = supabase.from("categories").select("id, name, icon, type").order("name");
+  const accsPromise = supabase.from("accounts").select("id, name, balance, type").eq("user_id", user.id).eq("is_active", true).order("created_at");
+  const [catsRes, accsRes] = await Promise.all([catsPromise, accsPromise]);
 
-  const categories = (catsData  ?? []) as Pick<CategoryRow, "id" | "name" | "icon" | "type">[];
-  const accounts   = (accsData  ?? []) as Pick<AccountRow,  "id" | "name" | "balance">[];
+  const categories = (catsRes.data ?? []) as Pick<CategoryRow, "id" | "name" | "icon" | "type">[];
+  const accounts = (accsRes.data ?? []) as Pick<AccountRow, "id" | "name" | "balance">[];
 
   if (accounts.length === 0) {
     return (

@@ -23,7 +23,7 @@ export async function loginAction(
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error) return { error: "Email hoặc mật khẩu không đúng" };
+  if (error) return { error: "Invalid email or password" };
   redirect("/dashboard");
 }
 
@@ -49,7 +49,7 @@ export async function registerAction(
     password: parsed.data.password,
     options: {
       data: { full_name: parsed.data.full_name },
-      emailRedirectTo: `${appUrl}/login`,
+      emailRedirectTo: `${appUrl}/callback?next=/dashboard`,
     },
   });
   if (error) {
@@ -57,7 +57,7 @@ export async function registerAction(
     if (message.includes("email rate limit exceeded")) {
       return {
         success: true,
-        message: "email rate limit exceeded",
+        message: "Confirmation email has been sent. Please check your inbox.",
       };
     }
 

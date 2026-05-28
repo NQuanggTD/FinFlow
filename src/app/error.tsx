@@ -17,38 +17,33 @@ export default function Error({
   const isUnexpectedResponse = msg.includes(
     "An unexpected response was received from the server",
   );
-
-  // When Next reports this generic unexpected-response error during the
-  // registration flow, show a friendly registration-success UI and
-  // automatically redirect to `/login` after a short delay.
+  // Only treat Next's generic "unexpected response" as a registration
+  // success UX when it happens while the user is on the register page.
   useEffect(() => {
     if (!isUnexpectedResponse) return;
     if (typeof window === "undefined") return;
+    const pathname = window.location.pathname ?? "";
+    const isRegisterPath = pathname.startsWith("/register");
+    if (!isRegisterPath) return;
     const t = setTimeout(() => (window.location.href = "/login"), 3000);
     return () => clearTimeout(t);
   }, [isUnexpectedResponse]);
 
-  if (isUnexpectedResponse) {
+  if (isUnexpectedResponse && typeof window !== "undefined" && window.location.pathname.startsWith("/register")) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <div className="text-center max-w-md">
           <p className="text-5xl mb-4">✅</p>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
-            Đăng ký thành công
-          </h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Registration successful</h2>
           <p className="text-gray-500 text-sm mb-6">
-            Vui lòng kiểm tra email để xác nhận tài khoản. Bạn sẽ được chuyển
-            tới trang đăng nhập trong vài giây.
+            Please check your email to confirm your account. You will be redirected to the login page shortly.
           </p>
           <div className="flex gap-3 justify-center">
-            <Button
-              variant="outline"
-              onClick={() => (window.location.href = "/login")}
-            >
-              Về đăng nhập
+            <Button variant="outline" onClick={() => (window.location.href = "/login")}>
+              Go to login
             </Button>
             <Button onClick={() => (window.location.href = "/")}>
-              Trang chủ
+              Home
             </Button>
           </div>
         </div>
@@ -60,18 +55,15 @@ export default function Error({
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="text-center max-w-md">
         <p className="text-5xl mb-4">⚠️</p>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Đã xảy ra lỗi</h2>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">An error occurred</h2>
         <p className="text-gray-500 text-sm mb-6">
-          {error.message || "Lỗi không xác định. Vui lòng thử lại."}
+          {error.message || "An unknown error occurred. Please try again."}
         </p>
         <div className="flex gap-3 justify-center">
-          <Button
-            variant="outline"
-            onClick={() => (window.location.href = "/dashboard")}
-          >
-            Về Dashboard
+          <Button variant="outline" onClick={() => (window.location.href = "/dashboard")}>
+            Back to dashboard
           </Button>
-          <Button onClick={reset}>Thử lại</Button>
+          <Button onClick={reset}>Retry</Button>
         </div>
       </div>
     </div>

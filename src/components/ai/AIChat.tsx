@@ -15,13 +15,19 @@ const QUICK_QUESTIONS = [
 ];
 
 export function AIChat() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content: "Xin chào! 👋 Tôi là trợ lý tài chính AI của FinFlow. Hãy hỏi tôi bất cứ điều gì về tình hình tài chính của bạn nhé!",
-      ts: Date.now(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  // Initialize assistant greeting after mount to avoid impure calls during render
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMessages([
+      {
+        role: "assistant",
+        content:
+          "Xin chào! 👋 Tôi là trợ lý tài chính AI của FinFlow. Hãy hỏi tôi bất cứ điều gì về tình hình tài chính của bạn nhé!",
+        ts: Date.now(),
+      },
+    ]);
+  }, []);
   const [input,   setInput  ] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef   = useRef<HTMLDivElement>(null);

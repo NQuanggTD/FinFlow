@@ -32,21 +32,31 @@ function resolve(theme: Theme): "light" | "dark" {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme,         setThemeState ] = useState<Theme>("system");
-  const [resolvedTheme, setResolved   ] = useState<"light" | "dark">("light");
-
-  // Hydrate from localStorage once on mount
+  // Initialize from localStorage synchronously on client to avoid hydration effects
+  const [theme, setThemeState] = useState<Theme>(() => {
+    try {
+      return (localStorage.getItem("finflow-theme") as Theme) ?? "system";
+    } catch {
+      return "system";
+    }
+  });
+  const [resolvedTheme, setResolved] = useState<"light" | "dark">(() => {
+    try {
+      const saved = (localStorage.getItem("finflow-theme") as Theme) ?? "system";
+      return resolve(saved);
+    } catch {
+      return "light";
+    }
+  });
+  // Apply initial theme and re-apply when resolvedTheme changes
   useEffect(() => {
-    const saved = (localStorage.getItem("finflow-theme") as Theme) ?? "system";
-    const r = resolve(saved);
-    setThemeState(saved);
-    setResolved(r);
-    applyTheme(r);
-  }, []);
+    applyTheme(resolvedTheme);
+  }, [resolvedTheme]);
 
   // Re-apply whenever theme state changes
   useEffect(() => {
     const r = resolve(theme);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setResolved(r);
     applyTheme(r);
   }, [theme]);

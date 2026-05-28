@@ -3,24 +3,25 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
   const { searchParams, origin } = new URL(req.url);
-  const code  = searchParams.get("code");
+  const code = searchParams.get("code");
   const error = searchParams.get("error");
-  const next  = searchParams.get("next") ?? "/dashboard";
+  const next = searchParams.get("next") ?? "/dashboard";
 
   // Handle OAuth error from Supabase
   if (error) {
     const errorDesc = searchParams.get("error_description") ?? error;
     return NextResponse.redirect(
-      `${origin}/login?message=${encodeURIComponent("Lỗi xác thực: " + errorDesc)}`
+      `${origin}/login?message=${encodeURIComponent("Authentication error: " + errorDesc)}`,
     );
   }
 
   if (code) {
     const supabase = await createClient();
-    const { error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
+    const { error: sessionError } =
+      await supabase.auth.exchangeCodeForSession(code);
     if (sessionError) {
       return NextResponse.redirect(
-        `${origin}/login?message=${encodeURIComponent("Phiên đăng nhập không hợp lệ, vui lòng thử lại")}`
+        `${origin}/login?message=${encodeURIComponent("Invalid session, please try again")}`,
       );
     }
   }
