@@ -1,7 +1,7 @@
 // src/components/dashboard/DashboardShell.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { SummaryCards } from "@/components/dashboard/SummaryCards";
 import { CashFlowChart } from "@/components/charts/CashFlowChart";
