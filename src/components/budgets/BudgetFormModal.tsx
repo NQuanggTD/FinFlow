@@ -1,37 +1,47 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Modal }   from "@/components/ui/Modal";
-import { Input }   from "@/components/ui/Input";
-import { Select }  from "@/components/ui/Select";
-import { Button }  from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { upsertBudgetAction } from "@/actions/budgets";
-import { createClient }       from "@/lib/supabase/client";
-import { useToast }           from "@/components/ui/Toast";
+import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/ui/Toast";
 
 interface Props {
-  open:      boolean;
-  onClose:   () => void;
+  open: boolean;
+  onClose: () => void;
   onSuccess: () => void;
-  month:     number;
-  year:      number;
+  month: number;
+  year: number;
 }
 
-interface Category { id: string; name: string; icon: string; }
+interface Category {
+  id: string;
+  name: string;
+  icon: string;
+}
 
 const ALERT_OPTIONS = [
-  { value: 50,  label: "50% – Cảnh báo sớm"   },
-  { value: 70,  label: "70%"                   },
-  { value: 80,  label: "80% – Mặc định"        },
-  { value: 90,  label: "90% – Cảnh báo muộn"  },
-  { value: 100, label: "100% – Khi vượt hạn"  },
+  { value: 50, label: "50% – Cảnh báo sớm" },
+  { value: 70, label: "70%" },
+  { value: 80, label: "80% – Mặc định" },
+  { value: 90, label: "90% – Cảnh báo muộn" },
+  { value: 100, label: "100% – Khi vượt hạn" },
 ];
 
-export function BudgetFormModal({ open, onClose, onSuccess, month, year }: Props) {
+export function BudgetFormModal({
+  open,
+  onClose,
+  onSuccess,
+  month,
+  year,
+}: Props) {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [catLoading, setCatLoading ] = useState(false);
-  const [saving,     setSaving     ] = useState(false);
+  const [catLoading, setCatLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -57,19 +67,39 @@ export function BudgetFormModal({ open, onClose, onSuccess, month, year }: Props
     const result = await upsertBudgetAction(fd);
     setSaving(false);
     if ("error" in result) toast(result.error ?? "Lỗi không xác định", "error");
-    else { toast("Đã lưu ngân sách! 🎯", "success"); onSuccess(); }
+    else {
+      toast("Đã lưu ngân sách! 🎯", "success");
+      onSuccess();
+    }
   }
 
-  const MONTHS = ["","Tháng 1","Tháng 2","Tháng 3","Tháng 4","Tháng 5","Tháng 6","Tháng 7","Tháng 8","Tháng 9","Tháng 10","Tháng 11","Tháng 12"];
+  const MONTHS = [
+    "",
+    "Tháng 1",
+    "Tháng 2",
+    "Tháng 3",
+    "Tháng 4",
+    "Tháng 5",
+    "Tháng 6",
+    "Tháng 7",
+    "Tháng 8",
+    "Tháng 9",
+    "Tháng 10",
+    "Tháng 11",
+    "Tháng 12",
+  ];
 
   return (
     <Modal open={open} onClose={onClose} title="Thiết lập ngân sách" size="sm">
       <form onSubmit={handleSubmit} className="space-y-4">
         <input type="hidden" name="month" value={month} />
-        <input type="hidden" name="year"  value={year}  />
+        <input type="hidden" name="year" value={year} />
 
         <p className="text-sm text-gray-500 bg-indigo-50 rounded-lg p-3">
-          📅 Ngân sách cho <strong>{MONTHS[month]}/{year}</strong>
+          📅 Ngân sách cho{" "}
+          <strong>
+            {MONTHS[month]}/{year}
+          </strong>
         </p>
 
         {catLoading ? (
@@ -83,7 +113,10 @@ export function BudgetFormModal({ open, onClose, onSuccess, month, year }: Props
             label="Danh mục chi tiêu"
             required
             placeholder="Chọn danh mục..."
-            options={categories.map((c) => ({ value: c.id, label: `${c.icon} ${c.name}` }))}
+            options={categories.map((c) => ({
+              value: c.id,
+              label: `${c.icon} ${c.name}`,
+            }))}
           />
         )}
 
@@ -102,13 +135,28 @@ export function BudgetFormModal({ open, onClose, onSuccess, month, year }: Props
           name="alert_at_percent"
           label="Cảnh báo khi đạt"
           defaultValue={80}
-          options={ALERT_OPTIONS.map((a) => ({ value: a.value, label: a.label }))}
+          options={ALERT_OPTIONS.map((a) => ({
+            value: a.value,
+            label: a.label,
+          }))}
           hint="Nhận thông báo khi chi tiêu đạt % này"
         />
 
         <div className="flex gap-3 pt-2">
-          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Huỷ</Button>
-          <Button type="submit" className="flex-1" loading={saving} disabled={catLoading}>
+          <Button
+            type="button"
+            variant="outline"
+            className="flex-1"
+            onClick={onClose}
+          >
+            Huỷ
+          </Button>
+          <Button
+            type="submit"
+            className="flex-1"
+            loading={saving}
+            disabled={catLoading}
+          >
             Lưu ngân sách
           </Button>
         </div>
