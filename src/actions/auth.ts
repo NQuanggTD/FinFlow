@@ -4,7 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import { loginSchema, registerSchema } from "@/lib/validations/auth";
 import { redirect } from "next/navigation";
 
-type ActionState = { error?: string; success?: boolean } | null;
+type ActionState = {
+  error?: string;
+  success?: boolean;
+  message?: string;
+} | null;
 
 export async function loginAction(
   _prevState: ActionState,
@@ -37,26 +41,31 @@ export async function registerAction(
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const supabase = await createClient();
-  // First try a regular sign up which will send confirmation if configured.
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
+  // Với confirm email bật, chỉ cần sign up và gửi email xác nhận.
   const { error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
-    options: { data: { full_name: parsed.data.full_name } },
+    options: {
+      data: { full_name: parsed.data.full_name },
+      emailRedirectTo: `${appUrl}/login`,
+    },
   });
-  if (error) return { error: error.message };
-  // Try to sign the user in automatically. This will succeed when
-  // the Supabase project does not require email confirmation.
-  const { error: signInErr } = await supabase.auth.signInWithPassword({
-    email: parsed.data.email,
-    password: parsed.data.password,
-  });
-  if (!signInErr) {
-    // Logged in successfully; return success and let client navigate.
-    return { success: true };
+  if (error) {
+    const message = error.message.toLowerCase();
+    if (message.includes("email rate limit exceeded")) {
+      return {
+        success: true,
+        message: "email rate limit exceeded",
+      };
+    }
+
+    return { error: error.message };
   }
 
-  // Sign-up succeeded but sign-in didn't (e.g. email confirmation required).
-  // Inform client to show success message and navigate to login.
+  // Sign-up thành công. Nếu Supabase bật confirm email, user sẽ kiểm tra
+  // hộp thư rồi bấm link xác nhận trước khi đăng nhập.
   return { success: true };
 }
 

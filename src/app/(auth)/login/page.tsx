@@ -21,15 +21,21 @@ export default async function LoginPage({ searchParams }: Props) {
             <div className="inline-flex items-center justify-center w-14 h-14 bg-indigo-600 rounded-2xl mb-3 shadow-lg">
               <span className="text-2xl">💰</span>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">Chào mừng trở lại</h1>
-            <p className="text-gray-500 text-sm mt-1">Đăng nhập vào tài khoản FinFlow</p>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Chào mừng trở lại
+            </h1>
+            <p className="text-gray-500 text-sm mt-1">
+              Đăng nhập vào tài khoản FinFlow
+            </p>
           </div>
 
           {/* Success message from register */}
           {params.message && (
-            <div className="mb-5 p-3.5 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm flex items-start gap-2">
+            <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-sm text-emerald-700 flex items-start gap-2">
               <span className="flex-shrink-0">✅</span>
-              <span>{params.message}</span>
+              <div className="leading-5 font-medium">
+                Đã gửi email xác nhận, vui lòng kiểm tra hộp thư
+              </div>
             </div>
           )}
 
@@ -37,7 +43,10 @@ export default async function LoginPage({ searchParams }: Props) {
 
           <p className="text-center text-sm text-gray-500 mt-6">
             Chưa có tài khoản?{" "}
-            <a href="/register" className="text-indigo-600 font-semibold hover:underline">
+            <a
+              href="/register"
+              className="text-indigo-600 font-semibold hover:underline"
+            >
               Đăng ký miễn phí
             </a>
           </p>
