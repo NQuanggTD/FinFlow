@@ -1,12 +1,14 @@
 "use client";
 
+import { useEffect } from "react";
 import { useActionState } from "react";
-import { useFormStatus }  from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useRouter } from "next/navigation";
 import { registerAction } from "@/actions/auth";
-import { Input }          from "@/components/ui/Input";
-import { Button }         from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
 
-type State = { error?: string } | null;
+type State = { error?: string; success?: boolean; message?: string } | null;
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -18,7 +20,19 @@ function SubmitButton() {
 }
 
 export function RegisterForm() {
-  const [state, formAction] = useActionState<State, FormData>(registerAction, null);
+  const router = useRouter();
+  const [state, formAction] = useActionState<State, FormData>(
+    registerAction,
+    null,
+  );
+
+  useEffect(() => {
+    if (state?.success) {
+      // Give user a short moment to read success message, then go to login.
+      const t = setTimeout(() => router.push("/login"), 1500);
+      return () => clearTimeout(t);
+    }
+  }, [state, router]);
 
   return (
     <form action={formAction} className="space-y-4">
@@ -27,12 +41,43 @@ export function RegisterForm() {
           <span>⚠️</span> {state.error}
         </div>
       )}
-      <Input name="full_name" label="Họ và tên" placeholder="Nguyễn Văn A" required leftAddon="👤" />
-      <Input name="email" type="email" label="Email" placeholder="you@example.com" required leftAddon="✉️" />
-      <Input name="password" type="password" label="Mật khẩu" placeholder="Tối thiểu 8 ký tự"
-        required leftAddon="🔒" hint="Ít nhất 8 ký tự" />
-      <Input name="confirmPassword" type="password" label="Xác nhận mật khẩu"
-        placeholder="Nhập lại mật khẩu" required leftAddon="🔒" />
+      {state?.success && (
+        <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-lg text-sm text-emerald-700 flex items-center gap-2">
+          <span>✅</span> Đăng ký thành công — chuyển tới trang đăng nhập...
+        </div>
+      )}
+      <Input
+        name="full_name"
+        label="Họ và tên"
+        placeholder="Nguyễn Văn A"
+        required
+        leftAddon="👤"
+      />
+      <Input
+        name="email"
+        type="email"
+        label="Email"
+        placeholder="you@example.com"
+        required
+        leftAddon="✉️"
+      />
+      <Input
+        name="password"
+        type="password"
+        label="Mật khẩu"
+        placeholder="Tối thiểu 8 ký tự"
+        required
+        leftAddon="🔒"
+        hint="Ít nhất 8 ký tự"
+      />
+      <Input
+        name="confirmPassword"
+        type="password"
+        label="Xác nhận mật khẩu"
+        placeholder="Nhập lại mật khẩu"
+        required
+        leftAddon="🔒"
+      />
       <SubmitButton />
     </form>
   );
