@@ -1,49 +1,52 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Modal } from "@/components/ui/Modal";
-import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
-import { updateTransactionAction } from "@/actions/transactions";
-import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
+import { createTransactionAction } from "@/actions/transactions";
+import { createClient } from "@/lib/supabase/client";
 import { formatCurrency } from "@/lib/utils/format";
-import type { TransactionWithRelations } from "@/hooks/useTransactions";
-import type { CategoryRow, AccountRow } from "@/types/database";
 import { cn } from "@/lib/utils/cn";
+import type { CategoryRow, AccountRow } from "@/types/database";
 
 interface Props {
-  transaction: TransactionWithRelations;
   open: boolean;
+  defaultDate: string;
   onClose: () => void;
   onSaved: () => void;
 }
 
-export function TransactionEditModal({
-  transaction: t,
+export function AddTransactionModal({
   open,
+  defaultDate,
   onClose,
   onSaved,
 }: Props) {
-  const [txType, setTxType] = useState<"income" | "expense">(t.type);
-  const [amount, setAmount] = useState(String(t.amount));
-  const [accountId, setAccountId] = useState(t.account_id);
-  const [categoryId, setCategoryId] = useState(t.category_id);
-  const [date, setDate] = useState(t.date);
-  const [note, setNote] = useState(t.note ?? "");
+  const [txType, setTxType] = useState<"income" | "expense">("expense");
+  const [amount, setAmount] = useState("");
+  const [accountId, setAccountId] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [date, setDate] = useState(defaultDate);
+  const [note, setNote] = useState("");
+  const [isRecurring, setIsRecurring] = useState(false);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const isFirstMount = useRef(true);
+  const amountRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!open) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDate(defaultDate);
     const sb = createClient();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    void (sb.from("categories") as any)
+    void sb
+      .from("categories")
       .select("*")
       .order("name")
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -58,39 +61,42 @@ export function TransactionEditModal({
       .order("name")
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then(({ data }: any) => {
-        setAccounts((data ?? []) as AccountRow[]);
+        const accs = (data ?? []) as AccountRow[];
+        setAccounts(accs);
+        if (accs.length > 0) setAccountId((prev) => prev || accs[0].id);
       });
-  }, [open]);
 
-  // Note: we intentionally avoid synchronizing state via an effect here.
-  // The parent can remount this component (via `key`) when a different
-  // transaction is selected to reset local form state without causing
-  // cascading setState calls inside effects.
-
-  // Reset categoryId only when user changes type (not on initial mount or tx change)
-  useEffect(() => {
-    if (isFirstMount.current) {
-      isFirstMount.current = false;
-      return;
-    }
-    setCategoryId("");
-  }, [txType]);
+    setTimeout(() => amountRef.current?.focus(), 100);
+  }, [open, defaultDate]);
 
   const filteredCats = categories.filter((c) => c.type === txType);
+
+  function handleTypeChange(t: "income" | "expense") {
+    setTxType(t);
+    setCategoryId("");
+  }
+
+  function resetForm() {
+    setAmount("");
+    setCategoryId("");
+    setNote("");
+    setIsRecurring(false);
+  }
 
   async function handleSave() {
     if (!accountId) {
       toast("Vui lòng chọn tài khoản", "error");
       return;
     }
-    if (!amount || Number(amount) <= 0) {
-      toast("Số tiền không hợp lệ", "error");
-      return;
-    }
     if (!categoryId) {
       toast("Vui lòng chọn danh mục", "error");
       return;
     }
+    if (!amount || Number(amount) <= 0) {
+      toast("Số tiền không hợp lệ", "error");
+      return;
+    }
+
     setLoading(true);
     const fd = new FormData();
     fd.set("type", txType);
@@ -98,27 +104,38 @@ export function TransactionEditModal({
     fd.set("account_id", accountId);
     fd.set("category_id", categoryId);
     fd.set("date", date);
-    if (note) fd.set("note", note);
-    const res = await updateTransactionAction(t.id, fd);
+    fd.set("note", note);
+    fd.set("is_recurring", String(isRecurring));
+
+    const result = await createTransactionAction(fd);
     setLoading(false);
-    if ("error" in res) toast(res.error ?? "Lỗi cập nhật", "error");
-    else {
-      toast("Đã cập nhật giao dịch ✅", "success");
-      onSaved();
-      onClose();
+
+    if (result && "error" in result) {
+      toast(result.error ?? "Lỗi không xác định", "error");
+      return;
     }
+
+    toast("Giao dịch đã được tạo! 🎉", "success");
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["transactions"] }),
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] }),
+      queryClient.invalidateQueries({ queryKey: ["accounts"] }),
+      queryClient.invalidateQueries({ queryKey: ["budgets-usage"] }),
+    ]);
+    resetForm();
+    onSaved();
+    onClose();
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Chỉnh sửa giao dịch" size="md">
+    <Modal open={open} onClose={onClose} title="Thêm giao dịch" size="md">
       <div className="space-y-4">
-        {/* Type toggle */}
         <div className="flex rounded-xl overflow-hidden border border-gray-200 p-1 gap-1 bg-gray-50">
           {(["expense", "income"] as const).map((tp) => (
             <button
               key={tp}
               type="button"
-              onClick={() => setTxType(tp)}
+              onClick={() => handleTypeChange(tp)}
               className={cn(
                 "flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all",
                 txType === tp
@@ -134,23 +151,38 @@ export function TransactionEditModal({
         </div>
 
         <div>
-          <Input
-            label="Số tiền (VND)"
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            leftAddon="₫"
-            required
-            min={1}
-          />
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            Số tiền <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+              ₫
+            </span>
+            <input
+              ref={amountRef}
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleSave();
+              }}
+              placeholder="0"
+              min={1}
+              className="w-full pl-8 pr-4 py-2.5 rounded-lg border border-gray-300 text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+          </div>
           {amount && Number(amount) > 0 && (
-            <p className="text-xs text-indigo-600 font-medium mt-1">
+            <p className="text-xs text-indigo-600 mt-1 font-medium">
               {formatCurrency(Number(amount))}
             </p>
           )}
         </div>
 
-        {accounts.length > 0 ? (
+        {accounts.length === 0 ? (
+          <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
+            ⚠️ Chưa có tài khoản. Vui lòng thêm trong Cài đặt.
+          </p>
+        ) : (
           <Select
             label="Tài khoản"
             required
@@ -162,13 +194,15 @@ export function TransactionEditModal({
               label: `${a.name} · ${formatCurrency(a.balance)}`,
             }))}
           />
-        ) : (
-          <p className="text-sm text-gray-400 bg-gray-50 p-3 rounded-lg">
-            Đang tải tài khoản...
-          </p>
         )}
 
-        {filteredCats.length > 0 ? (
+        {filteredCats.length === 0 ? (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+            ⚠️ Không có danh mục{" "}
+            {txType === "expense" ? "chi tiêu" : "thu nhập"}. Vui lòng thêm
+            trong Cài đặt.
+          </div>
+        ) : (
           <Select
             label="Danh mục"
             required
@@ -180,11 +214,6 @@ export function TransactionEditModal({
               label: `${c.icon} ${c.name}`,
             }))}
           />
-        ) : (
-          <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
-            ⚠️ Không có danh mục{" "}
-            {txType === "expense" ? "chi tiêu" : "thu nhập"}.
-          </p>
         )}
 
         <div>
@@ -214,6 +243,24 @@ export function TransactionEditModal({
           />
         </div>
 
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <div
+            onClick={() => setIsRecurring((x) => !x)}
+            className={cn(
+              "w-10 h-6 rounded-full transition-colors flex items-center px-1",
+              isRecurring ? "bg-indigo-600" : "bg-gray-200",
+            )}
+          >
+            <div
+              className={cn(
+                "w-4 h-4 bg-white rounded-full shadow transition-transform",
+                isRecurring ? "translate-x-4" : "translate-x-0",
+              )}
+            />
+          </div>
+          <span className="text-sm text-gray-700">🔄 Giao dịch định kỳ</span>
+        </label>
+
         <div className="flex gap-3 pt-1">
           <Button variant="outline" className="flex-1" onClick={onClose}>
             Huỷ
@@ -223,7 +270,7 @@ export function TransactionEditModal({
             loading={loading}
             onClick={() => void handleSave()}
           >
-            Lưu thay đổi
+            {txType === "expense" ? "💸 Ghi chi tiêu" : "💰 Ghi thu nhập"}
           </Button>
         </div>
       </div>

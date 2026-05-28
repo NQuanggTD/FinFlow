@@ -2,13 +2,16 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useRealtimeTransactions } from "@/hooks/useSupabaseRealtime";
+import { TransactionEditModal } from "@/components/transactions/TransactionEditModal";
+import { AddTransactionModal } from "@/components/transactions/AddTransactionModal";
+import type { TransactionWithRelations } from "@/hooks/useTransactions";
 
-// ─── Types ──────────────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Props {
   userId: string;
@@ -39,10 +42,8 @@ const MONTH_NAMES = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Return Tailwind bg class based on ratio 0–1 for heatmap */
 function heatBg(ratio: number, direction: "positive" | "negative"): string {
   if (ratio <= 0) return "";
-
   const palette =
     direction === "positive"
       ? ["bg-sky-50", "bg-sky-100", "bg-sky-200", "bg-sky-300", "bg-sky-400"]
@@ -53,7 +54,6 @@ function heatBg(ratio: number, direction: "positive" | "negative"): string {
           "bg-rose-300",
           "bg-rose-400",
         ];
-
   if (ratio < 0.2) return palette[0];
   if (ratio < 0.4) return palette[1];
   if (ratio < 0.6) return palette[2];
@@ -61,7 +61,6 @@ function heatBg(ratio: number, direction: "positive" | "negative"): string {
   return palette[4];
 }
 
-/** Export array of transactions as CSV download */
 function exportCSV(
   transactions: Array<{
     amount: number;
@@ -125,7 +124,7 @@ function CalendarSkeleton() {
           {Array.from({ length: 7 }).map((_, c) => (
             <div
               key={c}
-              className="h-[88px] border-r border-b border-gray-50/80 p-1.5"
+              className="h-22 border-r border-b border-gray-50/80 p-1.5"
             >
               <div className="w-6 h-6 rounded-full bg-gray-100 mb-1.5" />
               <div className="space-y-1">
@@ -186,7 +185,7 @@ function TrendChart({ daysCount, month, year, dayMap }: TrendChartProps) {
             Thu
           </span>
           <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-sm bg-rose-400   inline-block" />
+            <span className="w-2 h-2 rounded-sm bg-rose-400 inline-block" />
             Chi
           </span>
         </div>
@@ -204,7 +203,6 @@ function TrendChart({ daysCount, month, year, dayMap }: TrendChartProps) {
             const hasData = b.income > 0 || b.expense > 0;
             return (
               <g key={b.day}>
-                {/* Income bar */}
                 {b.income > 0 && (
                   <rect
                     x={x}
@@ -216,7 +214,6 @@ function TrendChart({ daysCount, month, year, dayMap }: TrendChartProps) {
                     opacity={0.8}
                   />
                 )}
-                {/* Expense bar */}
                 {b.expense > 0 && (
                   <rect
                     x={x + BAR_W / 2}
@@ -228,7 +225,6 @@ function TrendChart({ daysCount, month, year, dayMap }: TrendChartProps) {
                     opacity={0.8}
                   />
                 )}
-                {/* Day label — only show every 5 days or on edges */}
                 {(b.day === 1 || b.day % 5 === 0 || b.day === daysCount) && (
                   <text
                     x={x + BAR_W / 2}
@@ -268,6 +264,9 @@ interface DayCellProps {
   heatRatio: number;
   heatDirection: "positive" | "negative" | null;
   onClick: () => void;
+  onAdd: () => void;
+  onEdit?: () => void;
+  onDoubleClick?: () => void;
 }
 
 function DayCell({
@@ -287,6 +286,9 @@ function DayCell({
   heatRatio,
   heatDirection,
   onClick,
+  onAdd,
+  onEdit,
+  onDoubleClick,
 }: DayCellProps) {
   const hasTx = txCount > 0;
   const netPositive = income >= expense;
@@ -294,7 +296,7 @@ function DayCell({
   const bgClass = isSelected
     ? "bg-indigo-50 ring-1 ring-inset ring-indigo-300 z-10"
     : isFuture
-      ? "bg-gray-50/30 cursor-default"
+      ? "bg-gray-50/30"
       : viewMode === "heatmap" && hasTx
         ? heatDirection
           ? heatBg(heatRatio, heatDirection)
@@ -304,11 +306,24 @@ function DayCell({
   return (
     <div
       onClick={onClick}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        if (onDoubleClick) {
+          onDoubleClick();
+        } else {
+          onAdd();
+        }
+      }}
       className={cn(
-        "h-[88px] border-r border-b border-gray-50 p-1.5 transition-all duration-150 select-none relative group",
-        !isFuture && "cursor-pointer",
+        "h-22 border-r border-b border-gray-50 p-1.5 transition-all duration-150 select-none relative group",
+        "cursor-pointer",
         bgClass,
       )}
+      title={
+        hasTx
+          ? "Click để xem · Double-click để sửa"
+          : "Click để xem · Double-click để thêm"
+      }
     >
       {/* Day number */}
       <div
@@ -329,7 +344,7 @@ function DayCell({
       </div>
 
       {/* Recurring badge */}
-      {isRecurring && !isFuture && (
+      {isRecurring && (
         <span
           className="absolute top-1 right-1 text-[9px]"
           title="Có giao dịch định kỳ"
@@ -339,7 +354,7 @@ function DayCell({
       )}
 
       {/* Transaction data */}
-      {hasTx && !isFuture && (
+      {hasTx && (
         <div className="space-y-0.5">
           {income > 0 && (
             <p className="text-[9px] font-semibold text-emerald-600 leading-tight truncate">
@@ -366,11 +381,14 @@ function DayCell({
         </div>
       )}
 
-      {/* Quick-add button — appears on hover for non-future, non-selected days */}
+      {/* Quick-add button — appears on hover */}
       {!isFuture && !isSelected && (
-        <Link
-          href={`/transactions/new?date=${dateStr}`}
-          onClick={(e) => e.stopPropagation()}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAdd();
+          }}
           className={cn(
             "absolute bottom-1 right-1 w-5 h-5 rounded-full bg-indigo-600 text-white",
             "flex items-center justify-center text-[13px] leading-none font-bold",
@@ -379,11 +397,30 @@ function DayCell({
           title={`Thêm giao dịch ${dateStr}`}
         >
           +
-        </Link>
+        </button>
+      )}
+
+      {/* Edit button — only shows if there are transactions */}
+      {!isSelected && onEdit && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+          className={cn(
+            "absolute bottom-1 right-7 w-5 h-5 rounded-full bg-white text-gray-600 border border-gray-200",
+            "flex items-center justify-center text-[11px] leading-none",
+            "opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-gray-50",
+          )}
+          title={`Sửa giao dịch ${dateStr}`}
+        >
+          ✏️
+        </button>
       )}
 
       {/* Net dot */}
-      {hasTx && !isFuture && viewMode === "normal" && (
+      {hasTx && viewMode === "normal" && (
         <div
           className={cn(
             "absolute bottom-1.5 right-1.5 w-1.5 h-1.5 rounded-full",
@@ -396,7 +433,7 @@ function DayCell({
   );
 }
 
-// ─── Category Breakdown (mini bar chart in detail panel) ─────────────────────
+// ─── Category Breakdown ───────────────────────────────────────────────────────
 
 interface CategoryBreakdownProps {
   transactions: Array<{
@@ -442,11 +479,11 @@ function CategoryBreakdown({ transactions }: CategoryBreakdownProps) {
       <div className="space-y-1.5">
         {byCategory.map((c) => (
           <div key={c.name} className="flex items-center gap-2">
-            <span className="text-sm flex-shrink-0">{c.icon}</span>
+            <span className="text-sm shrink-0">{c.icon}</span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between mb-0.5">
                 <p className="text-[11px] text-gray-600 truncate">{c.name}</p>
-                <p className="text-[11px] font-semibold text-rose-500 ml-2 flex-shrink-0">
+                <p className="text-[11px] font-semibold text-rose-500 ml-2 shrink-0">
                   {formatCurrency(c.total)}
                 </p>
               </div>
@@ -464,23 +501,43 @@ function CategoryBreakdown({ transactions }: CategoryBreakdownProps) {
   );
 }
 
-// ─── Transaction Detail Panel ────────────────────────────────────────────────
+// ─── Transaction Detail Panel ─────────────────────────────────────────────────
 
 interface TxPanelProps {
   dateStr: string;
-  transactions: Array<{
-    id: string;
-    amount: number;
-    type: string;
-    date: string;
-    note?: string | null;
-    categories: { name: string; icon: string; color?: string } | null;
-    accounts: { name: string } | null;
-  }>;
+  transactions: TransactionWithRelations[];
   onClose: () => void;
+  onAdd: () => void;
+  onOpenEdit?: (t: TransactionWithRelations | null) => void;
+  isEditPickerOpen?: boolean;
+  onToggleEditPicker?: () => void;
+  onCloseEditPicker?: () => void;
 }
 
-function TxPanel({ dateStr, transactions, onClose }: TxPanelProps) {
+function TxPanel({
+  dateStr,
+  transactions,
+  onClose,
+  onAdd,
+  onOpenEdit,
+  isEditPickerOpen,
+  onToggleEditPicker,
+  onCloseEditPicker,
+}: TxPanelProps) {
+  const incomeTxs = useMemo(
+    () => transactions.filter((t) => t.type === "income"),
+    [transactions],
+  );
+  const expenseTxs = useMemo(
+    () => transactions.filter((t) => t.type === "expense"),
+    [transactions],
+  );
+
+  function handlePickEdit(t: TransactionWithRelations) {
+    onCloseEditPicker?.();
+    onOpenEdit?.(t);
+  }
+
   const income = transactions
     .filter((t) => t.type === "income")
     .reduce((s, t) => s + t.amount, 0);
@@ -490,154 +547,333 @@ function TxPanel({ dateStr, transactions, onClose }: TxPanelProps) {
   const net = income - expense;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
-      {/* Header */}
-      <div className="px-5 py-3.5 border-b border-gray-100">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-[11px] font-medium text-indigo-500 uppercase tracking-wider mb-0.5">
-              Chi tiết ngày
-            </p>
-            <h3 className="font-semibold text-gray-900 text-sm">
-              {formatDate(dateStr, "EEEE, dd/MM/yyyy")}
-            </h3>
+    <>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-visible animate-in fade-in slide-in-from-bottom-4 duration-300">
+        {/* Header */}
+        <div className="px-5 py-3.5 border-b border-gray-100">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[11px] font-medium text-indigo-500 uppercase tracking-wider mb-0.5">
+                Chi tiết ngày
+              </p>
+              <h3 className="font-semibold text-gray-900 text-sm">
+                {formatDate(dateStr, "EEEE, dd/MM/yyyy")}
+              </h3>
+            </div>
+            <div className="flex items-center gap-2 mt-0.5">
+              {/* Quick-add from panel — now a button, not a Link */}
+              <button
+                type="button"
+                onClick={onAdd}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[11px] font-semibold hover:bg-indigo-700 transition-colors"
+              >
+                <svg
+                  className="w-3 h-3"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2.5}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                Thêm
+              </button>
+
+              {/* Edit picker */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => onToggleEditPicker?.()}
+                  disabled={transactions.length === 0}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-gray-200 text-gray-600 text-[11px] font-semibold hover:bg-gray-50 hover:border-gray-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M16.862 3.487a2.1 2.1 0 113 2.97L7.5 18.82l-4 1 1-4 12.362-12.333z"
+                    />
+                  </svg>
+                  Sửa
+                </button>
+
+                {isEditPickerOpen && transactions.length > 0 && (
+                  <div className="absolute right-0 mt-2 w-64 rounded-xl border border-gray-200 bg-white shadow-lg z-20 p-2">
+                    <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                      Chọn giao dịch
+                    </p>
+                    {incomeTxs.length > 0 && (
+                      <div className="pb-1">
+                        <p className="px-2 pt-1 text-[10px] font-semibold text-emerald-600">
+                          Thu nhập
+                        </p>
+                        <div className="space-y-1">
+                          {incomeTxs.map((t) => (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => handlePickEdit(t)}
+                              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-emerald-50 text-left"
+                            >
+                              <span className="text-sm">
+                                {t.categories?.icon ?? "💳"}
+                              </span>
+                              <span className="text-[11px] text-gray-700 truncate">
+                                {t.categories?.name ?? "Khác"}
+                              </span>
+                              <span className="ml-auto text-[11px] font-semibold text-emerald-600">
+                                +{formatCurrency(t.amount)}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {expenseTxs.length > 0 && (
+                      <div className="pt-1">
+                        <p className="px-2 pt-1 text-[10px] font-semibold text-rose-600">
+                          Chi tiêu
+                        </p>
+                        <div className="space-y-1">
+                          {expenseTxs.map((t) => (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => handlePickEdit(t)}
+                              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-rose-50 text-left"
+                            >
+                              <span className="text-sm">
+                                {t.categories?.icon ?? "💳"}
+                              </span>
+                              <span className="text-[11px] text-gray-700 truncate">
+                                {t.categories?.name ?? "Khác"}
+                              </span>
+                              <span className="ml-auto text-[11px] font-semibold text-rose-600">
+                                −{formatCurrency(t.amount)}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={onClose}
+                className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Đóng"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2 mt-0.5">
-            {/* Quick-add from panel */}
-            <Link
-              href={`/transactions/new?date=${dateStr}`}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[11px] font-semibold hover:bg-indigo-700 transition-colors"
-            >
-              <svg
-                className="w-3 h-3"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2.5}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              Thêm
-            </Link>
+
+          {/* Mini summary */}
+          {transactions.length > 0 && (
+            <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-50">
+              {income > 0 && (
+                <div>
+                  <p className="text-[10px] text-gray-400 mb-0.5">Thu nhập</p>
+                  <p className="text-sm font-semibold text-emerald-600">
+                    +{formatCurrency(income)}
+                  </p>
+                </div>
+              )}
+              {expense > 0 && (
+                <div>
+                  <p className="text-[10px] text-gray-400 mb-0.5">Chi tiêu</p>
+                  <p className="text-sm font-semibold text-rose-500">
+                    −{formatCurrency(expense)}
+                  </p>
+                </div>
+              )}
+              {income > 0 && expense > 0 && (
+                <div className="ml-auto">
+                  <p className="text-[10px] text-gray-400 mb-0.5">Số dư ngày</p>
+                  <p
+                    className={cn(
+                      "text-sm font-semibold",
+                      net >= 0 ? "text-emerald-600" : "text-rose-500",
+                    )}
+                  >
+                    {net >= 0 ? "+" : "−"}
+                    {formatCurrency(Math.abs(net))}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Transaction list */}
+        {transactions.length === 0 ? (
+          <div className="py-10 flex flex-col items-center gap-2 text-center">
+            <span className="text-3xl">📭</span>
+            <p className="text-sm text-gray-400">
+              Không có giao dịch vào ngày này
+            </p>
             <button
-              onClick={onClose}
-              className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
-              aria-label="Đóng"
+              type="button"
+              onClick={onAdd}
+              className="mt-1 text-xs text-indigo-600 font-medium hover:underline"
             >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
+              + Thêm giao dịch mới
             </button>
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="max-h-64 overflow-y-auto">
+              {incomeTxs.length > 0 && (
+                <div>
+                  <p className="px-5 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-600">
+                    Thu nhập
+                  </p>
+                  <div className="divide-y divide-gray-50">
+                    {incomeTxs.map((t) => (
+                      <div
+                        key={t.id}
+                        onDoubleClick={() => onOpenEdit?.(t)}
+                        className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors cursor-pointer group/item"
+                        title="Double-click để chỉnh sửa"
+                      >
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0 bg-emerald-50">
+                          {t.categories?.icon ?? "💳"}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">
+                            {t.categories?.name ?? "Khác"}
+                          </p>
+                          <p className="text-[11px] text-gray-400 truncate">
+                            {t.accounts?.name ?? ""}
+                            {t.note
+                              ? (t.accounts?.name ? " · " : "") + t.note
+                              : ""}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-sm font-semibold text-emerald-600">
+                            +{formatCurrency(t.amount)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenEdit?.(t);
+                            }}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors opacity-0 group-hover/item:opacity-100"
+                            aria-label={`Sửa ${t.categories?.name ?? "giao dịch"}`}
+                          >
+                            <svg
+                              className="w-3.5 h-3.5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M16.862 3.487a2.1 2.1 0 113 2.97L7.5 18.82l-4 1 1-4 12.362-12.333z"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-        {/* Mini summary */}
-        {transactions.length > 0 && (
-          <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-50">
-            {income > 0 && (
-              <div>
-                <p className="text-[10px] text-gray-400 mb-0.5">Thu nhập</p>
-                <p className="text-sm font-semibold text-emerald-600">
-                  +{formatCurrency(income)}
-                </p>
-              </div>
-            )}
-            {expense > 0 && (
-              <div>
-                <p className="text-[10px] text-gray-400 mb-0.5">Chi tiêu</p>
-                <p className="text-sm font-semibold text-rose-500">
-                  −{formatCurrency(expense)}
-                </p>
-              </div>
-            )}
-            {income > 0 && expense > 0 && (
-              <div className="ml-auto">
-                <p className="text-[10px] text-gray-400 mb-0.5">Số dư ngày</p>
-                <p
-                  className={cn(
-                    "text-sm font-semibold",
-                    net >= 0 ? "text-emerald-600" : "text-rose-500",
-                  )}
-                >
-                  {net >= 0 ? "+" : "−"}
-                  {formatCurrency(Math.abs(net))}
-                </p>
-              </div>
-            )}
-          </div>
+              {expenseTxs.length > 0 && (
+                <div>
+                  <p className="px-5 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-rose-600">
+                    Chi tiêu
+                  </p>
+                  <div className="divide-y divide-gray-50">
+                    {expenseTxs.map((t) => (
+                      <div
+                        key={t.id}
+                        onDoubleClick={() => onOpenEdit?.(t)}
+                        className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors cursor-pointer group/item"
+                        title="Double-click để chỉnh sửa"
+                      >
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0 bg-rose-50">
+                          {t.categories?.icon ?? "💳"}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">
+                            {t.categories?.name ?? "Khác"}
+                          </p>
+                          <p className="text-[11px] text-gray-400 truncate">
+                            {t.accounts?.name ?? ""}
+                            {t.note
+                              ? (t.accounts?.name ? " · " : "") + t.note
+                              : ""}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-sm font-semibold text-rose-500">
+                            −{formatCurrency(t.amount)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenEdit?.(t);
+                            }}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors opacity-0 group-hover/item:opacity-100"
+                            aria-label={`Sửa ${t.categories?.name ?? "giao dịch"}`}
+                          >
+                            <svg
+                              className="w-3.5 h-3.5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M16.862 3.487a2.1 2.1 0 113 2.97L7.5 18.82l-4 1 1-4 12.362-12.333z"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <CategoryBreakdown transactions={transactions} />
+          </>
         )}
       </div>
-
-      {/* Transaction list */}
-      {transactions.length === 0 ? (
-        <div className="py-10 flex flex-col items-center gap-2 text-center">
-          <span className="text-3xl">📭</span>
-          <p className="text-sm text-gray-400">
-            Không có giao dịch vào ngày này
-          </p>
-          <Link
-            href={`/transactions/new?date=${dateStr}`}
-            className="mt-1 text-xs text-indigo-600 font-medium hover:underline"
-          >
-            + Thêm giao dịch mới
-          </Link>
-        </div>
-      ) : (
-        <>
-          <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
-            {transactions.map((t) => (
-              <div
-                key={t.id}
-                className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
-              >
-                <div
-                  className={cn(
-                    "w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0",
-                    t.type === "income" ? "bg-emerald-50" : "bg-rose-50",
-                  )}
-                >
-                  {t.categories?.icon ?? "💳"}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800 truncate">
-                    {t.categories?.name ?? "Khác"}
-                  </p>
-                  <p className="text-[11px] text-gray-400 truncate">
-                    {t.accounts?.name ?? ""}
-                    {t.note ? (t.accounts?.name ? " · " : "") + t.note : ""}
-                  </p>
-                </div>
-                <span
-                  className={cn(
-                    "text-sm font-semibold flex-shrink-0",
-                    t.type === "income" ? "text-emerald-600" : "text-rose-500",
-                  )}
-                >
-                  {t.type === "income" ? "+" : "−"}
-                  {formatCurrency(t.amount)}
-                </span>
-              </div>
-            ))}
-          </div>
-          {/* Category breakdown */}
-          <CategoryBreakdown transactions={transactions} />
-        </>
-      )}
-    </div>
+    </>
   );
 }
 
@@ -647,22 +883,37 @@ export function CalendarView({ userId, initialMonth, initialYear }: Props) {
   const [month, setMonth] = useState(initialMonth);
   const [year, setYear] = useState(initialYear);
   const [selected, setSelected] = useState<string | null>(null);
+  const [editingTransaction, setEditingTransaction] =
+    useState<TransactionWithRelations | null>(null);
+  const [editPickerDate, setEditPickerDate] = useState<string | null>(null);
+  const [addingDate, setAddingDate] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterType>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("normal");
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
 
-  // ── Realtime ──────────────────────────────────────────────────────────
+  const queryClient = useQueryClient();
+
+  function handleSaved() {
+    void queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    void queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+    setEditingTransaction(null);
+  }
+
+  function handleAdded() {
+    void queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    void queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+  }
+
   useRealtimeTransactions(userId);
 
-  // ── Data ──────────────────────────────────────────────────────────────
   const {
     data: allTransactions = [],
     isLoading,
     isFetching,
   } = useTransactions(month, year);
 
-  // ── Filtered transactions (for display on cells & search) ─────────────
+  // Filtered transactions for display on cells & search
   const transactions = useMemo(() => {
     let list = allTransactions;
     if (filter !== "all") list = list.filter((t) => t.type === filter);
@@ -677,7 +928,7 @@ export function CalendarView({ userId, initialMonth, initialYear }: Props) {
     return list;
   }, [allTransactions, filter, search]);
 
-  // ── dayMap built from *filtered* transactions ─────────────────────────
+  // dayMap from filtered transactions (cells)
   const dayMap = useMemo(() => {
     const map: Record<string, typeof transactions> = {};
     transactions.forEach((t) => {
@@ -687,7 +938,16 @@ export function CalendarView({ userId, initialMonth, initialYear }: Props) {
     return map;
   }, [transactions]);
 
-  // ── Monthly summaries (always from unfiltered) ────────────────────────
+  // dayMap from ALL transactions (edit flow)
+  const dayMapAll = useMemo(() => {
+    const map: Record<string, typeof allTransactions> = {};
+    allTransactions.forEach((t) => {
+      if (!map[t.date]) map[t.date] = [];
+      map[t.date].push(t);
+    });
+    return map;
+  }, [allTransactions]);
+
   const monthlyIncome = useMemo(
     () =>
       allTransactions
@@ -704,21 +964,19 @@ export function CalendarView({ userId, initialMonth, initialYear }: Props) {
   );
   const monthlyNet = monthlyIncome - monthlyExpense;
 
-  // ── Heatmap: max daily net delta across month ────────────────────────
   const maxDailyNetDelta = useMemo(() => {
     const vals = Object.values(dayMap).map((txs) => {
-      const income = txs
+      const inc = txs
         .filter((t) => t.type === "income")
         .reduce((s, t) => s + t.amount, 0);
-      const expense = txs
+      const exp = txs
         .filter((t) => t.type === "expense")
         .reduce((s, t) => s + t.amount, 0);
-      return Math.abs(income - expense);
+      return Math.abs(inc - exp);
     });
     return Math.max(...vals, 1);
   }, [dayMap]);
 
-  // ── Calendar grid ─────────────────────────────────────────────────────
   const today = new Date().toISOString().split("T")[0];
   const firstDay = new Date(year, month - 1, 1).getDay();
   const daysCount = new Date(year, month, 0).getDate();
@@ -738,9 +996,10 @@ export function CalendarView({ userId, initialMonth, initialYear }: Props) {
     );
   }, [month, year]);
 
-  // ── Navigation ────────────────────────────────────────────────────────
+  // Navigation
   const prevMonth = useCallback(() => {
     setSelected(null);
+    setEditPickerDate(null);
     setSearch("");
     if (month === 1) {
       setMonth(12);
@@ -751,6 +1010,7 @@ export function CalendarView({ userId, initialMonth, initialYear }: Props) {
   const nextMonth = useCallback(() => {
     if (isNextDisabled) return;
     setSelected(null);
+    setEditPickerDate(null);
     setSearch("");
     if (month === 12) {
       setMonth(1);
@@ -763,17 +1023,17 @@ export function CalendarView({ userId, initialMonth, initialYear }: Props) {
     setMonth(now.getMonth() + 1);
     setYear(now.getFullYear());
     setSelected(today);
+    setEditPickerDate(null);
     setSearch("");
   }, [today]);
 
-  // ── Selected day ──────────────────────────────────────────────────────
-  // Detail panel uses allTransactions (not filtered) for the selected day
+  // Selected day transactions (unfiltered)
   const selectedTxs = useMemo(
     () => (selected ? allTransactions.filter((t) => t.date === selected) : []),
     [selected, allTransactions],
   );
 
-  // ── Search results list ───────────────────────────────────────────────
+  // Search results
   const searchResults = useMemo(() => {
     if (!search.trim()) return [];
     return transactions.slice().sort((a, b) => b.date.localeCompare(a.date));
@@ -783,9 +1043,9 @@ export function CalendarView({ userId, initialMonth, initialYear }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* ── Toolbar: filter + view mode + search + export ── */}
+      {/* ── Toolbar ── */}
       <div className="flex flex-wrap items-center gap-2">
-        {/* Type filter pills */}
+        {/* Type filter */}
         <div className="flex items-center bg-white border border-gray-200 rounded-xl p-0.5 gap-0.5 shadow-sm">
           {(["all", "income", "expense"] as FilterType[]).map((f) => (
             <button
@@ -927,7 +1187,7 @@ export function CalendarView({ userId, initialMonth, initialYear }: Props) {
         </div>
       )}
 
-      {/* Search results list (shown instead of calendar when searching) */}
+      {/* Search results */}
       {search.trim() && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-in fade-in duration-200">
           <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
@@ -946,11 +1206,13 @@ export function CalendarView({ userId, initialMonth, initialYear }: Props) {
               {searchResults.map((t) => (
                 <div
                   key={t.id}
-                  className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
+                  onDoubleClick={() => setEditingTransaction(t)}
+                  className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors cursor-pointer"
+                  title="Double-click để chỉnh sửa"
                 >
                   <div
                     className={cn(
-                      "w-8 h-8 rounded-xl flex items-center justify-center text-base flex-shrink-0",
+                      "w-8 h-8 rounded-xl flex items-center justify-center text-base shrink-0",
                       t.type === "income" ? "bg-emerald-50" : "bg-rose-50",
                     )}
                   >
@@ -1011,8 +1273,6 @@ export function CalendarView({ userId, initialMonth, initialYear }: Props) {
             <h2 className="font-semibold text-gray-900 text-[15px]">
               {MONTH_NAMES[month - 1]} {year}
             </h2>
-
-            {/* Live badge */}
             <div
               className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-100"
               title="Cập nhật thời gian thực"
@@ -1025,14 +1285,11 @@ export function CalendarView({ userId, initialMonth, initialYear }: Props) {
                 Live
               </span>
             </div>
-
-            {/* Heatmap badge */}
             {viewMode === "heatmap" && (
               <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-semibold border border-amber-200">
                 🔥 Heatmap
               </span>
             )}
-
             {isFetching && !isLoading && (
               <svg
                 className="w-3.5 h-3.5 text-indigo-400 animate-spin"
@@ -1150,12 +1407,13 @@ export function CalendarView({ userId, initialMonth, initialYear }: Props) {
               return (
                 <div
                   key={`empty-${idx}`}
-                  className="h-[88px] border-r border-b border-gray-50 bg-gray-50/30"
+                  className="h-22 border-r border-b border-gray-50 bg-gray-50/30"
                 />
               );
 
             const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
             const txs = dayMap[dateStr] ?? [];
+            const allTxs = dayMapAll[dateStr] ?? [];
             const dayIncome = txs
               .filter((t) => t.type === "income")
               .reduce((s, t) => s + t.amount, 0);
@@ -1192,6 +1450,33 @@ export function CalendarView({ userId, initialMonth, initialYear }: Props) {
                 onClick={() =>
                   !isFuture &&
                   setSelected(dateStr === selected ? null : dateStr)
+                }
+                onAdd={() => {
+                  setAddingDate(dateStr);
+                }}
+                onEdit={
+                  allTxs.length > 0
+                    ? () => {
+                        setSelected(dateStr);
+                        if (allTxs.length === 1) {
+                          setEditingTransaction(allTxs[0]);
+                        } else {
+                          setEditPickerDate(dateStr);
+                        }
+                      }
+                    : undefined
+                }
+                onDoubleClick={
+                  allTxs.length > 0
+                    ? () => {
+                        setSelected(dateStr);
+                        if (allTxs.length === 1) {
+                          setEditingTransaction(allTxs[0]);
+                        } else {
+                          setEditPickerDate(dateStr);
+                        }
+                      }
+                    : undefined
                 }
               />
             );
@@ -1234,7 +1519,36 @@ export function CalendarView({ userId, initialMonth, initialYear }: Props) {
           key={selected}
           dateStr={selected}
           transactions={selectedTxs}
-          onClose={() => setSelected(null)}
+          onClose={() => {
+            setSelected(null);
+            setEditPickerDate(null);
+          }}
+          onAdd={() => setAddingDate(selected)}
+          onOpenEdit={(t) => setEditingTransaction(t)}
+          isEditPickerOpen={editPickerDate === selected}
+          onToggleEditPicker={() =>
+            setEditPickerDate((prev) => (prev === selected ? null : selected))
+          }
+          onCloseEditPicker={() => setEditPickerDate(null)}
+        />
+      )}
+
+      {/* ── Add transaction modal ── */}
+      <AddTransactionModal
+        open={Boolean(addingDate)}
+        defaultDate={addingDate ?? today}
+        onClose={() => setAddingDate(null)}
+        onSaved={handleAdded}
+      />
+
+      {/* ── Edit transaction modal ── */}
+      {editingTransaction && (
+        <TransactionEditModal
+          key={editingTransaction.id}
+          transaction={editingTransaction}
+          open={Boolean(editingTransaction)}
+          onClose={() => setEditingTransaction(null)}
+          onSaved={handleSaved}
         />
       )}
     </div>
