@@ -1,23 +1,39 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = { title: "Thêm giao dịch – FinFlow" };
 
-import { createClient }    from "@/lib/supabase/server";
-import { redirect }        from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import { TransactionForm } from "@/components/transactions/TransactionForm";
 import type { CategoryRow, AccountRow } from "@/types/database";
 import Link from "next/link";
 
 export default async function NewTransactionPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const catsPromise = supabase.from("categories").select("id, name, icon, type").order("name");
-  const accsPromise = supabase.from("accounts").select("id, name, balance, type").eq("user_id", user.id).eq("is_active", true).order("created_at");
+  const catsPromise = supabase
+    .from("categories")
+    .select("id, name, icon, type")
+    .order("name");
+  const accsPromise = supabase
+    .from("accounts")
+    .select("id, name, balance, type")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .order("created_at");
   const [catsRes, accsRes] = await Promise.all([catsPromise, accsPromise]);
 
-  const categories = (catsRes.data ?? []) as Pick<CategoryRow, "id" | "name" | "icon" | "type">[];
-  const accounts = (accsRes.data ?? []) as Pick<AccountRow, "id" | "name" | "balance">[];
+  const categories = (catsRes.data ?? []) as Pick<
+    CategoryRow,
+    "id" | "name" | "icon" | "type"
+  >[];
+  const accounts = (accsRes.data ?? []) as Pick<
+    AccountRow,
+    "id" | "name" | "balance"
+  >[];
 
   if (accounts.length === 0) {
     return (
@@ -27,7 +43,8 @@ export default async function NewTransactionPage() {
           <p className="text-3xl">⚠️</p>
           <p className="font-semibold text-amber-800">Chưa có tài khoản nào</p>
           <p className="text-sm text-amber-600">
-            Vui lòng tạo ít nhất một tài khoản (ngân hàng, tiền mặt...) trước khi ghi giao dịch.
+            Vui lòng tạo ít nhất một tài khoản (ngân hàng, tiền mặt...) trước
+            khi ghi giao dịch.
           </p>
           <Link
             href="/settings"
@@ -43,12 +60,17 @@ export default async function NewTransactionPage() {
   return (
     <div className="max-w-lg mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/transactions" className="text-gray-400 hover:text-gray-600 transition-colors">
+        <Link
+          href="/transactions"
+          className="text-gray-400 hover:text-gray-600 transition-colors"
+        >
           ← Quay lại
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Thêm giao dịch</h1>
-          <p className="text-gray-500 text-sm">Ghi lại thu nhập hoặc chi tiêu của bạn</p>
+          <p className="text-gray-500 text-sm">
+            Ghi lại thu nhập hoặc chi tiêu của bạn
+          </p>
         </div>
       </div>
       <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
